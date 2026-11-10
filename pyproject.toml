@@ -1,0 +1,19 @@
+[project]
+name = "engineering-project-management-server"
+version = "0.1.0"
+description = "工程项目管理 FastAPI 服务端"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100,<1.0",
+    "uvicorn[standard]>=0.23,<1.0",
+    "sqlalchemy>=2.0,<3.0",
+    "pydantic>=2.0,<3.0",
+    "pymysql>=1.1,<2.0",
+    "python-multipart>=0.0.9,<1.0",
+]
+
+[project.scripts]
+epm-server = "app.main:app"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
