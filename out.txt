@@ -1,0 +1,14 @@
+旧表已清理
+新表已创建
+共 11 张表:
+  operation_logs (18列): id, operation_type, module, operator, operator_name, project_id, product_id, process_id, process_step_id, target_id, target_name, operation_summary, old_value, new_value, request_path, request_method, request_ip, created_at
+  permissions (6列): id, module, perm_type, action, code, description
+  process_steps (13列): id, process_id, step_code, step_name, sort_order, standard_hours, work_center, equipment, description, created_by, updated_by, created_at, updated_at
+  processes (11列): id, product_id, process_code, process_name, version, status, description, created_by, updated_by, created_at, updated_at
+  product_images (4列): id, product_id, image_path, sort_order
+  products (11列): id, project_id, product_code, product_name, product_image, status, notes, created_by, updated_by, created_at, updated_at
+  projects (12列): id, name, customer, location, start_date, end_date, status, description, created_by, updated_by, created_at, updated_at
+  role_permissions (2列): role_id, permission_id
+  roles (3列): id, name, created_at
+  tasks (10列): id, user_id, project_id, task_date, content, status, progress, note, created_at, updated_at
+  users (8列): id, username, password, name, employee_no, status, role_id, created_at

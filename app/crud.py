@@ -342,10 +342,13 @@ def list_tasks(
     task_date: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    product_id: int | None = None,
 ) -> list[models.Task]:
     query = db.query(models.Task)
     if user_id is not None:
         query = query.filter(models.Task.user_id == user_id)
+    if product_id is not None:
+        query = query.filter(models.Task.product_id == product_id)
     if task_date:
         query = query.filter(models.Task.task_date == task_date)
     if start_date:
@@ -418,28 +421,37 @@ ROLE_PRESETS: list[dict] = [
     {
         "name": "项目经理",
         "codes": [
-            "project:menu", "product:menu", "task:menu", "role:menu", "permission:menu", "user:menu",
+            "project:menu", "product:menu", "craft:menu", "process:menu", "task:menu", "task_stats:menu", "role:menu", "permission:menu", "user:menu",
             "project:create", "project:edit", "project:delete", "project:export", "project:audit", "project:reject", "project:print",
             "product:create", "product:edit",
+            "craft:create", "craft:edit", "craft:delete", "craft:export",
+            "process:create", "process:edit", "process:delete", "process:export",
             "task:create", "task:edit", "task:delete", "task:export",
-            "project:api", "product:api", "task:api", "role:api", "permission:api", "user:api",
+            "task_stats:export",
+            "project:api", "product:api", "craft:api", "process:api", "task:api", "task_stats:api", "role:api", "permission:api", "user:api",
         ],
     },
     {
         "name": "产品经理",
         "codes": [
-            "product:menu", "project:menu", "task:menu",
+            "product:menu", "project:menu", "craft:menu", "process:menu", "task:menu", "task_stats:menu",
             "product:create", "product:edit", "product:delete", "product:export", "product:print",
+            "craft:create", "craft:edit", "craft:export",
+            "process:create", "process:edit", "process:export",
             "task:create", "task:edit", "task:export",
-            "project:api", "product:api", "task:api",
+            "task_stats:export",
+            "project:api", "product:api", "craft:api", "process:api", "task:api", "task_stats:api",
         ],
     },
     {
         "name": "普通用户",
         "codes": [
-            "project:menu", "product:menu", "task:menu",
+            "project:menu", "product:menu", "craft:menu", "process:menu", "task:menu", "task_stats:menu",
+            "craft:create", "craft:edit",
+            "process:create", "process:edit",
             "task:create", "task:edit", "task:delete", "task:export",
-            "project:api", "product:api", "task:api",
+            "task_stats:export",
+            "project:api", "product:api", "craft:api", "process:api", "task:api", "task_stats:api",
         ],
     },
 ]
@@ -486,6 +498,310 @@ def ensure_default_roles(db: Session):
 
     db.commit()
     logger.info("已初始化 %d 个预设角色（超级管理员、项目经理、产品经理、普通用户）", len(ROLE_PRESETS))
+
+
+# ---------- crafts ----------
+
+def list_crafts(
+    db: Session,
+    q: str | None = None,
+    project_id: int | None = None,
+    product_id: int | None = None,
+) -> list[models.Craft]:
+    query = db.query(models.Craft)
+    if project_id is not None:
+        query = query.filter(models.Craft.project_id == project_id)
+    if product_id is not None:
+        query = query.filter(models.Craft.product_id == product_id)
+    query = _search_filter(query, models.Craft, q, ["craft_code", "craft_name", "description", "status"])
+    return query.all()
+
+
+def create_craft(db: Session, data: schemas.CraftCreate) -> models.Craft:
+    obj = models.Craft(**data.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def get_craft(db: Session, craft_id: int) -> models.Craft | None:
+    return db.query(models.Craft).filter(models.Craft.id == craft_id).first()
+
+
+def update_craft(db: Session, craft_id: int, data: schemas.CraftUpdate) -> models.Craft | None:
+    obj = get_craft(db, craft_id)
+    if not obj:
+        return None
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(obj, key, value)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def delete_craft(db: Session, craft_id: int) -> bool:
+    obj = get_craft(db, craft_id)
+    if not obj:
+        return False
+    db.delete(obj)
+    db.commit()
+    return True
+
+
+# ---------- processes ----------
+
+def list_processes(
+    db: Session,
+    craft_id: int | None = None,
+    q: str | None = None,
+) -> list[models.Process]:
+    query = db.query(models.Process)
+    if craft_id is not None:
+        query = query.filter(models.Process.craft_id == craft_id)
+    query = _search_filter(query, models.Process, q, ["process_code", "process_name", "equipment", "description", "status"])
+    return query.order_by(models.Process.sort_order, models.Process.id).all()
+
+
+def create_process(db: Session, data: schemas.ProcessCreate) -> models.Process:
+    obj = models.Process(**data.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def get_process(db: Session, process_id: int) -> models.Process | None:
+    return db.query(models.Process).filter(models.Process.id == process_id).first()
+
+
+def update_process(db: Session, process_id: int, data: schemas.ProcessUpdate) -> models.Process | None:
+    obj = get_process(db, process_id)
+    if not obj:
+        return None
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(obj, key, value)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def delete_process(db: Session, process_id: int) -> bool:
+    obj = get_process(db, process_id)
+    if not obj:
+        return False
+    db.delete(obj)
+    db.commit()
+    return True
+
+
+# ---------- operation logs ----------
+
+def list_operation_logs(
+    db: Session,
+    module: str | None = None,
+    action: str | None = None,
+    project_id: int | None = None,
+    product_id: int | None = None,
+    craft_id: int | None = None,
+    process_id: int | None = None,
+    operator: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    q: str | None = None,
+    limit: int = 200,
+) -> list[models.OperationLog]:
+    query = db.query(models.OperationLog)
+    if module:
+        query = query.filter(models.OperationLog.module == module)
+    if action:
+        query = query.filter(models.OperationLog.action == action)
+    if project_id is not None:
+        query = query.filter(models.OperationLog.project_id == project_id)
+    if product_id is not None:
+        query = query.filter(models.OperationLog.product_id == product_id)
+    if craft_id is not None:
+        query = query.filter(models.OperationLog.craft_id == craft_id)
+    if process_id is not None:
+        query = query.filter(models.OperationLog.process_id == process_id)
+    if operator:
+        query = query.filter(models.OperationLog.operator.ilike(f"%{operator}%"))
+    if start_date:
+        query = query.filter(models.OperationLog.created_at >= start_date)
+    if end_date:
+        query = query.filter(models.OperationLog.created_at <= end_date + " 23:59:59")
+    if q:
+        from sqlalchemy import or_
+        query = query.filter(or_(
+            models.OperationLog.target_name.ilike(f"%{q}%"),
+            models.OperationLog.remark.ilike(f"%{q}%"),
+        ))
+    return query.order_by(models.OperationLog.created_at.desc()).limit(limit).all()
+
+
+def create_operation_log(db: Session, data: schemas.OperationLogCreate) -> models.OperationLog:
+    obj = models.OperationLog(**data.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def get_operation_log(db: Session, log_id: int) -> models.OperationLog | None:
+    return db.query(models.OperationLog).filter(models.OperationLog.id == log_id).first()
+
+
+def delete_operation_log(db: Session, log_id: int) -> bool:
+    obj = get_operation_log(db, log_id)
+    if not obj:
+        return False
+    db.delete(obj)
+    db.commit()
+    return True
+
+
+def clear_operation_logs(db: Session, before_date: str | None = None) -> int:
+    query = db.query(models.OperationLog)
+    if before_date:
+        query = query.filter(models.OperationLog.created_at < before_date)
+    count = query.delete()
+    db.commit()
+    return count
+
+
+def get_task_stats(
+    db: Session,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    group_by: str = "user",
+) -> list[dict]:
+    from sqlalchemy import func
+
+    query = db.query(models.Task)
+    if start_date:
+        query = query.filter(models.Task.task_date >= start_date)
+    if end_date:
+        query = query.filter(models.Task.task_date <= end_date)
+
+    tasks: list[models.Task] = query.all()
+    users: list[models.User] = db.query(models.User).all()
+    products: list[models.Product] = db.query(models.Product).all()
+    user_map = {u.id: u for u in users}
+    product_map = {p.id: p for p in products}
+
+    statuses = ["待办", "进行中", "已完成", "已搁置"]
+
+    def _aggregate(items: list[models.Task], nested_key: str) -> dict:
+        total = len(items)
+        counts = {s: 0 for s in statuses}
+        plan_minutes = 0
+        actual_minutes = 0
+        weighted_progress = 0.0
+        nested_counts: dict[str, int] = {}
+        nested_done: dict[str, int] = {}
+        for t in items:
+            st = t.status or "待办"
+            if st in counts:
+                counts[st] += 1
+            if nested_key == "user":
+                nid = t.user_id
+                nmap = user_map
+            else:
+                nid = t.product_id
+                nmap = product_map
+            if nid is not None:
+                nobj = nmap.get(nid)
+                if nested_key == "user":
+                    nlabel = (nobj.name or nobj.username) if nobj else f"#{nid}"
+                else:
+                    nlabel = (nobj.product_name or nobj.product_code) if nobj else f"#{nid}"
+                nested_counts[nlabel] = nested_counts.get(nlabel, 0) + 1
+                if st == "已完成":
+                    nested_done[nlabel] = nested_done.get(nlabel, 0) + 1
+            plan_minutes += _time_range_minutes(t.plan_start_time, t.plan_end_time)
+            actual_minutes += _time_range_minutes(t.actual_start_time, t.actual_end_time)
+            weighted_progress += (t.progress or 0)
+        avg_progress = round(weighted_progress / total, 1) if total else 0
+        completion_rate = round(counts["已完成"] * 100.0 / total, 1) if total else 0
+
+        nested_info = []
+        for nlabel, ncnt in sorted(nested_counts.items(), key=lambda x: -x[1]):
+            ndone = nested_done.get(nlabel, 0)
+            nrate = round(ndone * 100.0 / ncnt, 1) if ncnt else 0
+            nested_info.append({
+                "name": nlabel,
+                "total": ncnt,
+                "done": ndone,
+                "rate": nrate,
+            })
+
+        entry = {
+            "total": total,
+            **{f"count_{s}": counts[s] for s in statuses},
+            "completion_rate": completion_rate,
+            "avg_progress": avg_progress,
+            "plan_minutes": plan_minutes,
+            "actual_minutes": actual_minutes,
+        }
+        if nested_key == "user":
+            entry["users"] = nested_info
+        else:
+            entry["products"] = nested_info
+        return entry
+
+    result: list[dict] = []
+
+    if group_by == "product":
+        grouped: dict[int | None, list[models.Task]] = {}
+        for t in tasks:
+            grouped.setdefault(t.product_id, []).append(t)
+
+        for pid, items in grouped.items():
+            product = product_map.get(pid) if pid is not None else None
+            base = _aggregate(items, nested_key="user")
+            users_info = base.pop("users", [])
+            result.append({
+                "product_id": pid,
+                "product_name": product.product_name if product else "",
+                "product_code": product.product_code if product else "",
+                "name": product.product_name if product else (f"产品#{pid}" if pid else "未关联产品"),
+                **base,
+                "users": users_info,
+            })
+    else:
+        grouped = {}
+        for t in tasks:
+            grouped.setdefault(t.user_id, []).append(t)
+
+        for uid, items in grouped.items():
+            user = user_map.get(uid)
+            base = _aggregate(items, nested_key="product")
+            result.append({
+                "user_id": uid,
+                "username": user.username if user else "",
+                "name": user.name if user else "",
+                "employee_no": user.employee_no if user else "",
+                **base,
+            })
+
+    result.sort(key=lambda x: x["completion_rate"], reverse=True)
+    return result
+
+
+def _time_range_minutes(start: str, end: str) -> int:
+    if not start or not end:
+        return 0
+    try:
+        from datetime import datetime
+        fmt = "%H:%M"
+        s = datetime.strptime(start, fmt)
+        e = datetime.strptime(end, fmt)
+        delta = (e - s).total_seconds() / 60
+        if delta > 0:
+            return int(delta)
+    except Exception:
+        pass
+    return 0
 
 
 try:
